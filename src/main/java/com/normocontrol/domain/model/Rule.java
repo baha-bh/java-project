@@ -15,6 +15,7 @@ import java.util.UUID;
 public class Rule {
     private UUID id;
     private String name;
+    private String code;
     private String description;
     private RuleSeverity severity;
     private Boolean isActive;

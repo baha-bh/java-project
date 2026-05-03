@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { FolderGit2, Plus, ArrowRight } from 'lucide-react';
+import { FolderGit2, Plus, ArrowRight, Upload } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
@@ -22,6 +22,11 @@ export const Dashboard = () => {
   const [newProjectRepo, setNewProjectRepo] = useState('');
   const [newProjectBranch, setNewProjectBranch] = useState('main');
   const [isCreating, setIsCreating] = useState(false);
+  
+  // Test Analysis State
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [testResults, setTestResults] = useState<any[] | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
   
   const navigate = useNavigate();
 
@@ -52,17 +57,13 @@ export const Dashboard = () => {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Starting project creation...');
     setIsCreating(true);
     try {
-      console.log('Fetching session...');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        console.log('No session found, redirecting...');
         navigate('/login');
         return;
       }
-      console.log('Session found, sending request...');
 
       const response = await axios.post('/api/v1/projects', {
         name: newProjectName,
@@ -74,7 +75,6 @@ export const Dashboard = () => {
         }
       });
       
-      console.log('Project created successfully:', response.data);
       setProjects(prev => [response.data, ...prev]);
       setIsCreateModalOpen(false);
       setNewProjectName('');
@@ -86,6 +86,39 @@ export const Dashboard = () => {
       alert(`Ошибка при создании проекта: ${message}`);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFile(e.target.files[0]);
+      setTestResults([]);
+    }
+  };
+
+  const handleTestAnalysis = async () => {
+    if (!selectedFile) return;
+    setIsTesting(true);
+    setTestResults(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await axios.post('/api/v1/analysis/test-file', formData, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+      setTestResults(response.data);
+    } catch (error: any) {
+      console.error('Error during test analysis:', error);
+      alert(`Ошибка при анализе файла: ${error.response?.data?.message || error.message}`);
+      setTestResults([]); // Set to empty to stop loading state
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -144,6 +177,81 @@ export const Dashboard = () => {
             ))}
           </div>
         )}
+
+        {/* Test Analysis Section */}
+        <section style={{ marginTop: '4rem', borderTop: '1px solid var(--glass-border)', paddingTop: '2rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Тестирование анализа</h2>
+            <div style={{ fontSize: '0.75rem', backgroundColor: 'var(--primary-color)', color: 'white', padding: '0.125rem 0.5rem', borderRadius: '1rem' }}>POC</div>
+          </div>
+          
+          <div className="glass-panel" style={{ padding: '2rem' }}>
+            <p style={{ color: 'var(--text-color-muted)', marginBottom: '1.5rem', fontSize: '0.875rem' }}>
+              Выберите Java-файл на вашем компьютере, чтобы мгновенно проверить его с помощью <strong>JavaParser</strong>.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Загрузить Java-файл</label>
+                <div style={{ position: 'relative' }}>
+                  <input 
+                    type="file" 
+                    accept=".java"
+                    id="file-upload"
+                    className="input-field" 
+                    onChange={handleFileChange}
+                    style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer', zIndex: 10 }}
+                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.625rem 1rem', border: '2px dashed var(--glass-border)', borderRadius: 'var(--radius-md)', color: selectedFile ? 'var(--text-color)' : 'var(--text-color-muted)' }}>
+                    <Upload size={18} />
+                    {selectedFile ? selectedFile.name : 'Нажмите для выбора файла...'}
+                  </div>
+                </div>
+              </div>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleTestAnalysis}
+                disabled={isTesting || !selectedFile}
+              >
+                {isTesting ? 'Проверка...' : 'Проверить файл'}
+              </button>
+            </div>
+
+            {testResults && testResults.length > 0 && (
+              <div style={{ marginTop: '2rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1rem' }}>Найдено нарушений: {testResults.length}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {testResults.map((v, i) => (
+                    <div key={i} style={{ padding: '1rem', backgroundColor: 'rgba(245, 158, 11, 0.05)', borderLeft: '4px solid var(--warning-color)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ fontWeight: '600', color: 'var(--warning-color)', marginBottom: '0.25rem', fontSize: '0.875rem' }}>
+                        {v.rule?.name || 'Нарушение правила'}
+                      </div>
+                      <div style={{ fontSize: '0.875rem', color: 'var(--text-color)' }}>
+                        {v.message}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-color-muted)', marginTop: '0.5rem' }}>
+                        Строка: {v.lineNumber}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {testResults && testResults.length === 0 && (
+              <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--success-color)', padding: '2rem', backgroundColor: 'rgba(16, 185, 129, 0.05)', borderRadius: 'var(--radius-md)' }}>
+                <h3 style={{ fontWeight: '600', marginBottom: '0.5rem' }}>Нарушений не найдено!</h3>
+                <p style={{ fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Файл соответствует всем правилам нормоконтроля.</p>
+              </div>
+            )}
+            
+            {!isTesting && !selectedFile && (
+              <div style={{ marginTop: '2rem', textAlign: 'center', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>
+                Выберите файл, чтобы запустить мгновенный анализ кода.
+              </div>
+            )}
+          </div>
+        </section>
       </main>
 
       {/* Create Project Modal */}

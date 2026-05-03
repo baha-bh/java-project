@@ -1,7 +1,6 @@
 package com.normocontrol.infrastructure.web.controller;
 
 import com.normocontrol.domain.model.Project;
-import com.normocontrol.domain.model.User;
 import com.normocontrol.domain.service.AnalysisService;
 import com.normocontrol.domain.service.ProjectService;
 import com.normocontrol.infrastructure.web.dto.request.ProjectRequest;
