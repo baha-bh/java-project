@@ -51,12 +51,15 @@ public class ProjectController {
         
         Project project = mapper.toDomain(request);
         
-        // Extract user from JWT (Supabase Auth)
+        UUID userId = null;
+        String email = null;
+        
         if (jwt != null && jwt.getSubject() != null) {
-            project.setOwner(User.builder().id(UUID.fromString(jwt.getSubject())).build());
+            userId = UUID.fromString(jwt.getSubject());
+            email = jwt.getClaimAsString("email");
         }
-
-        Project created = projectService.createProject(project);
+ 
+        Project created = projectService.createProject(project, userId, email);
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(created));
     }
 

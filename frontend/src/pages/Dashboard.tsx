@@ -39,7 +39,7 @@ export const Dashboard = () => {
             Authorization: `Bearer ${session.access_token}`
           }
         });
-        setProjects(response.data);
+        setProjects(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error('Error fetching projects:', error);
       } finally {
@@ -52,13 +52,17 @@ export const Dashboard = () => {
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Starting project creation...');
     setIsCreating(true);
     try {
+      console.log('Fetching session...');
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
+        console.log('No session found, redirecting...');
         navigate('/login');
         return;
       }
+      console.log('Session found, sending request...');
 
       const response = await axios.post('/api/v1/projects', {
         name: newProjectName,
@@ -70,14 +74,16 @@ export const Dashboard = () => {
         }
       });
       
-      setProjects([response.data, ...projects]);
+      console.log('Project created successfully:', response.data);
+      setProjects(prev => [response.data, ...prev]);
       setIsCreateModalOpen(false);
       setNewProjectName('');
       setNewProjectRepo('');
       setNewProjectBranch('main');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating project:', error);
-      alert('Ошибка при создании проекта');
+      const message = error.response?.data?.message || error.message || 'Произошла неизвестная ошибка';
+      alert(`Ошибка при создании проекта: ${message}`);
     } finally {
       setIsCreating(false);
     }
@@ -162,7 +168,7 @@ export const Dashboard = () => {
               <div>
                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>URL репозитория (Git)</label>
                 <input 
-                  type="url" 
+                  type="text" 
                   className="input-field" 
                   value={newProjectRepo}
                   onChange={(e) => setNewProjectRepo(e.target.value)}

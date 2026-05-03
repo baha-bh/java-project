@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import axios from 'axios';
 import { 
   ArrowLeft, 
-  Github, 
+  Code, 
   GitBranch, 
   Calendar, 
   Play, 
@@ -56,12 +56,11 @@ export const ProjectDetails = () => {
       const projectRes = await axios.get(`/api/v1/projects/${id}`, { headers });
       setProject(projectRes.data);
 
-      // Fetch checks
-      const checksRes = await axios.get('/api/v1/checks', { headers });
-      const projectChecks = checksRes.data.filter((c: any) => c.projectId === id);
-      setChecks(projectChecks.sort((a: any, b: any) => 
-        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
-      ));
+        const checksRes = await axios.get('/api/v1/checks', { headers });
+        const projectChecks = (checksRes.data || []).filter((c: any) => c.projectId === id);
+        setChecks(projectChecks.sort((a: any, b: any) => 
+          new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime()
+        ));
 
     } catch (err) {
       console.error('Error fetching project data:', err);
@@ -168,18 +167,18 @@ export const ProjectDetails = () => {
               <h1 style={{ fontSize: '2.5rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>{project.name}</h1>
               <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>
-                  <Github size={16} />
+                  <Code size={16} />
                   <a href={project.repositoryUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    {project.repositoryUrl.replace('https://github.com/', '')} <ExternalLink size={12} />
+                    {(project.repositoryUrl ?? '').replace('https://github.com/', '')} <ExternalLink size={12} />
                   </a>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>
                   <GitBranch size={16} />
-                  {project.branch || 'main'}
+                  {project.branch ?? 'main'}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>
                   <Calendar size={16} />
-                  Создан {new Date(project.createdAt).toLocaleDateString()}
+                  Создан {new Date(project.createdAt ?? Date.now()).toLocaleDateString()}
                 </div>
               </div>
             </div>

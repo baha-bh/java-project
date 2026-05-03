@@ -55,7 +55,7 @@ export const CheckDetails = () => {
         setCheck(checkRes.data);
 
         const violationsRes = await axios.get('/api/v1/violations', { headers });
-        const filteredViolations = violationsRes.data.filter((v: any) => v.checkResultId === id);
+        const filteredViolations = (violationsRes.data || []).filter((v: any) => v.checkResultId === id);
         setViolations(filteredViolations);
 
       } catch (error) {
@@ -116,10 +116,10 @@ export const CheckDetails = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-color)', fontWeight: '600' }}>
                     <ShieldCheck size={18} />
-                    {v.rule.name}
+                    {v.rule?.name || 'Неизвестное правило'}
                   </div>
                   <div style={{ fontSize: '0.75rem', backgroundColor: 'rgba(245, 158, 11, 0.1)', color: 'var(--warning-color)', padding: '0.25rem 0.5rem', borderRadius: '4px' }}>
-                    {v.rule.severity || 'MEDIUM'}
+                    {v.rule?.severity || 'MEDIUM'}
                   </div>
                 </div>
                 
