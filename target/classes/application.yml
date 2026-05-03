@@ -2,11 +2,11 @@ spring:
   application:
     name: normocontrol
 
-  # PostgreSQL Database
+  # PostgreSQL Database (Supabase)
   datasource:
-    url: jdbc:postgresql://localhost:5432/normocontrol
-    username: normocontrol
-    password: normocontrol_pass
+    url: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require
+    username: postgres.badawaighvqpegsxfvdc
+    password: ${SUPABASE_DB_PASSWORD:20050805BhbhBh}
     driver-class-name: org.postgresql.Driver
     hikari:
       maximum-pool-size: 10
@@ -42,21 +42,12 @@ spring:
           min-idle: 0
           max-wait: -1ms
 
-  # Kafka
-  kafka:
-    bootstrap-servers: localhost:9092
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.apache.kafka.common.serialization.StringSerializer
-      properties:
-        spring.json.add.type.headers: false
-    consumer:
-      group-id: normocontrol-group
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
+  # Supabase Auth
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://badawaighvqpegsxfvdc.supabase.co/auth/v1
 
   # Servlet
   servlet:
@@ -81,9 +72,6 @@ logging:
 
 # Application specific
 app:
-  jwt:
-    secret: ${JWT_SECRET:normocontrol-secret-key-for-jwt-token-generation-min-256-bits}
-    expiration: 86400000
   cors:
     allowed-origins: http://localhost:3000,http://localhost:8080
   analysis:
