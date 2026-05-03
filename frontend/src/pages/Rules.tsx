@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
@@ -8,8 +8,7 @@ import {
   Trash2, 
   AlertCircle,
   ToggleLeft,
-  ToggleRight,
-  Info
+  ToggleRight
 } from 'lucide-react';
 
 interface Rule {

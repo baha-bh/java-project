@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
@@ -8,9 +8,9 @@ import {
   AlertTriangle, 
   FileCode, 
   CheckCircle2, 
-  XCircle,
   Hash,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 
 interface Rule {
