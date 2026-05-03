@@ -30,7 +30,18 @@ import java.util.stream.Collectors;
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final AnalysisService analysisService;
     private final WebProjectMapper mapper;
+
+    @PostMapping("/{id}/analyze")
+    public ResponseEntity<ProjectResponse> analyzeProject(
+            @PathVariable UUID id) {
+        analysisService.runAnalysis(id);
+        return projectService.getProjectById(id)
+                .map(mapper::toResponse)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 
     @PostMapping
     public ResponseEntity<ProjectResponse> createProject(
