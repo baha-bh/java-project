@@ -45,6 +45,9 @@ public class RuleEntity {
     @Column(nullable = false, length = 20)
     private RuleSeverity severity;
 
+    @Column(nullable = true, length = 50)
+    private String category; // CODE, DOCUMENTATION
+
     @Column(name = "is_active")
     private Boolean isActive;
 

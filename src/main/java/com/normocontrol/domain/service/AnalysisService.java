@@ -5,6 +5,7 @@ import com.normocontrol.domain.model.CheckStatus;
 import com.normocontrol.domain.model.Project;
 import com.normocontrol.domain.model.Rule;
 import com.normocontrol.domain.model.Violation;
+import com.normocontrol.domain.model.AnalysisReport;
 import com.normocontrol.domain.port.CheckResultRepository;
 import com.normocontrol.domain.port.ProjectRepository;
 import com.normocontrol.domain.port.RuleRepository;
@@ -30,6 +31,8 @@ public class AnalysisService {
     private final RuleRepository ruleRepository;
     private final ViolationRepository violationRepository;
     private final StaticCodeAnalyzer staticCodeAnalyzer;
+    private final DocumentationAnalyzer documentationAnalyzer;
+    private final WordDocumentAnalyzer wordDocumentAnalyzer;
     private final GitService gitService;
 
     @Transactional
@@ -91,7 +94,7 @@ public class AnalysisService {
             }
 
             // 3. Perform Analysis
-            checkResult.setMessage("Анализ Java-файлов...");
+            checkResult.setMessage("Анализ кода и документов (.java, .md, .docx)...");
             checkResultRepository.save(checkResult);
 
             List<Rule> activeRules = ruleRepository.findAll().stream()
@@ -101,7 +104,7 @@ public class AnalysisService {
             int filesAnalyzed = analyzeDirectory(analysisDir, checkResult, activeRules);
 
             if (filesAnalyzed == 0) {
-                failCheck(checkResult, "В указанной папке не найдено Java-файлов для анализа.");
+                failCheck(checkResult, "В указанной папке не найдено подходящих файлов (.java, .md, .docx).");
                 return;
             }
 
@@ -112,7 +115,7 @@ public class AnalysisService {
 
             checkResult.setStatus(CheckStatus.PASSED);
             checkResult.setScore(Math.max(0, 100 - (int)violationCount * 5));
-            checkResult.setMessage("Анализ успешно завершен. Проверено файлов: " + filesAnalyzed);
+            checkResult.setMessage("Анализ завершен. Проверено файлов: " + filesAnalyzed);
             checkResult.setCompletedAt(OffsetDateTime.now());
             
             checkResultRepository.save(checkResult);
@@ -145,16 +148,24 @@ public class AnalysisService {
         for (File file : files) {
             if (file.isDirectory()) {
                 count += analyzeDirectory(file, checkResult, rules);
-            } else if (file.getName().endsWith(".java")) {
-                try {
-                    List<Violation> findings = staticCodeAnalyzer.analyzeFile(file, rules);
+            } else {
+                String fileName = file.getName().toLowerCase();
+                List<Violation> findings = null;
+                
+                if (fileName.endsWith(".java")) {
+                    findings = staticCodeAnalyzer.analyzeFile(file, rules);
+                } else if (fileName.endsWith(".md") || fileName.endsWith(".txt")) {
+                    findings = documentationAnalyzer.analyzeFile(file, rules);
+                } else if (fileName.endsWith(".docx")) {
+                    findings = wordDocumentAnalyzer.analyzeFile(file, rules);
+                }
+
+                if (findings != null) {
                     for (Violation v : findings) {
                         v.setCheckResult(checkResult);
                         violationRepository.save(v);
                     }
                     count++;
-                } catch (Exception e) {
-                    log.warn("Failed to analyze file: {}", file.getAbsolutePath(), e);
                 }
             }
         }
@@ -163,10 +174,21 @@ public class AnalysisService {
 
     public List<Violation> testAnalyzeFile(String filePath) {
         File file = new File(filePath);
+        String fileName = file.getName().toLowerCase();
+        
         List<Rule> activeRules = ruleRepository.findAll().stream()
                 .filter(Rule::getIsActive)
                 .toList();
-        return staticCodeAnalyzer.analyzeFile(file, activeRules);
+
+        if (fileName.endsWith(".java")) {
+            return staticCodeAnalyzer.analyzeFile(file, activeRules);
+        } else if (fileName.endsWith(".md") || fileName.endsWith(".txt")) {
+            return documentationAnalyzer.analyzeFile(file, activeRules);
+        } else if (fileName.endsWith(".docx")) {
+            return wordDocumentAnalyzer.analyzeFile(file, activeRules);
+        }
+        
+        return List.of();
     }
 
     public List<Violation> analyzeCode(String code) {
@@ -174,5 +196,30 @@ public class AnalysisService {
                 .filter(Rule::getIsActive)
                 .toList();
         return staticCodeAnalyzer.analyzeCode(code, activeRules);
+    }
+
+    public AnalysisReport generateTestReport(File file) {
+        String fileName = file.getName().toLowerCase();
+        List<Rule> activeRules = ruleRepository.findAll().stream()
+                .filter(Rule::getIsActive)
+                .toList();
+
+        if (fileName.endsWith(".docx")) {
+            return wordDocumentAnalyzer.analyzeReport(file, activeRules);
+        }
+
+        List<Violation> violations;
+        if (fileName.endsWith(".java")) {
+            violations = staticCodeAnalyzer.analyzeFile(file, activeRules);
+        } else {
+            violations = documentationAnalyzer.analyzeFile(file, activeRules);
+        }
+
+        return AnalysisReport.builder()
+                .fileName(file.getName())
+                .violations(violations)
+                .details(List.of())
+                .score(Math.max(0, 100 - violations.size() * 10))
+                .build();
     }
 }
