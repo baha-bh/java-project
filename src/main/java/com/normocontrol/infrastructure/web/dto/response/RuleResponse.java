@@ -18,6 +18,7 @@ public class RuleResponse {
     private String name;
     private String description;
     private RuleSeverity severity;
+    private String code;
     private Boolean isActive;
     private OffsetDateTime createdAt;
 }

@@ -41,4 +41,9 @@ public class UserRepositoryAdapter implements UserRepository {
         return springDataUserRepository.findById(id)
                 .map(userMapper::toDomain);
     }
+ 
+    @Override
+    public void deleteById(UUID id) {
+        springDataUserRepository.deleteById(id);
+    }
 }

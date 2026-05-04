@@ -23,15 +23,26 @@ public class ProjectService {
     @Transactional
     public Project createProject(Project project, UUID userId, String email) {
         if (userId != null) {
-            User user = userRepository.findById(userId).orElseGet(() -> {
-                User newUser = User.builder()
-                        .id(userId)
-                        .email(email)
-                        .username(email != null ? email : userId.toString())
-                        .role(Role.USER)
-                        .build();
-                return userRepository.save(newUser);
-            });
+            User user = userRepository.findById(userId)
+                .orElseGet(() -> userRepository.findByEmail(email)
+                    .map(existing -> {
+                        // User exists with same email but different ID (e.g. recreated in Supabase)
+                        // We delete the old record and create a new one with the current ID
+                        userRepository.deleteById(existing.getId());
+                        return userRepository.save(User.builder()
+                                .id(userId)
+                                .email(email)
+                                .username(email != null ? email : userId.toString())
+                                .role(existing.getRole())
+                                .build());
+                    })
+                    .orElseGet(() -> userRepository.save(User.builder()
+                            .id(userId)
+                            .email(email)
+                            .username(email != null ? email : userId.toString())
+                            .role(Role.USER)
+                            .build()))
+                );
             project.setOwner(user);
         }
         return projectRepository.save(project);

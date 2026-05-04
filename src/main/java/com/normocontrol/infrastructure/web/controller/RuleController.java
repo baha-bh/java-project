@@ -60,4 +60,12 @@ public class RuleController {
         ruleService.deleteRule(id);
         return ResponseEntity.noContent().build();
     }
+
+    @org.springframework.web.bind.annotation.PatchMapping("/{id}/toggle")
+    public ResponseEntity<RuleResponse> toggleRule(@PathVariable UUID id) {
+        return ruleService.toggleRuleStatus(id)
+                .map(mapper::toResponse)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
 }

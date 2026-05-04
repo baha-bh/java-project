@@ -93,6 +93,22 @@ export const Rules = () => {
     }
   };
 
+  const handleToggleRule = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const response = await axios.patch(`/api/v1/rules/${id}/toggle`, {}, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      
+      setRules(rules.map(r => r.id === id ? response.data : r));
+    } catch (error) {
+      console.error('Error toggling rule:', error);
+      alert('Ошибка при переключении правила');
+    }
+  };
+
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <Navbar />
@@ -121,6 +137,7 @@ export const Rules = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button 
+                      onClick={() => handleToggleRule(rule.id)}
                       style={{ background: 'none', border: 'none', color: rule.isActive ? 'var(--success-color)' : 'var(--text-color-muted)', cursor: 'pointer' }}
                       title={rule.isActive ? 'Активно' : 'Выключено'}
                     >

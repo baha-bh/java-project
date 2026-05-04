@@ -30,4 +30,11 @@ public class RuleService {
     public void deleteRule(UUID id) {
         ruleRepository.deleteById(id);
     }
+
+    public Optional<Rule> toggleRuleStatus(UUID id) {
+        return ruleRepository.findById(id).map(rule -> {
+            rule.setIsActive(!rule.getIsActive());
+            return ruleRepository.save(rule);
+        });
+    }
 }

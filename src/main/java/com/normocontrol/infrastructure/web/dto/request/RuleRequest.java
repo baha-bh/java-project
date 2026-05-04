@@ -22,5 +22,7 @@ public class RuleRequest {
     @NotNull(message = "Severity is required")
     private RuleSeverity severity;
 
+    private String code;
+
     private Boolean isActive;
 }
