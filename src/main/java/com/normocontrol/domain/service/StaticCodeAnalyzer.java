@@ -6,13 +6,16 @@ import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.normocontrol.domain.model.Rule;
 import com.normocontrol.domain.model.Violation;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Component
 public class StaticCodeAnalyzer {
 
@@ -80,6 +83,9 @@ public class StaticCodeAnalyzer {
 
     private void runRules(CompilationUnit cu, List<Violation> violations, String fileName, List<Rule> activeRules) {
         for (Rule rule : activeRules) {
+            log.debug("Checking rule: {} ({})", rule.getName(), rule.getCode());
+            
+            // Hardcoded rules
             if ("CLASS_NAMING".equals(rule.getCode())) {
                 cu.findAll(ClassOrInterfaceDeclaration.class).forEach(cls -> {
                     String name = cls.getNameAsString();
@@ -183,13 +189,17 @@ public class StaticCodeAnalyzer {
                         }
                     });
                 }
-            } else if (rule.getScriptLogic() != null && !rule.getScriptLogic().isBlank()) {
+            } 
+            
+            // AI-generated script logic (can be combined with hardcoded or standalone)
+            if (rule.getScriptLogic() != null && !rule.getScriptLogic().isBlank()) {
                 executeGroovyRule(cu, violations, fileName, rule);
             }
         }
     }
 
     private void executeGroovyRule(CompilationUnit cu, List<Violation> violations, String fileName, Rule rule) {
+        log.info("Executing Groovy script for rule: {}", rule.getName());
         try {
             groovy.lang.Binding binding = new groovy.lang.Binding();
             binding.setVariable("cu", cu);
@@ -199,6 +209,7 @@ public class StaticCodeAnalyzer {
             
             if (result instanceof List) {
                 List<Map<String, Object>> scriptViolations = (List<Map<String, Object>>) result;
+                log.info("Script for rule '{}' returned {} findings", rule.getName(), scriptViolations.size());
                 for (Map<String, Object> sv : scriptViolations) {
                     violations.add(Violation.builder()
                             .rule(rule)
@@ -207,8 +218,11 @@ public class StaticCodeAnalyzer {
                             .message(sv.get("message") != null ? sv.get("message").toString() : "Нарушение правила AI")
                             .build());
                 }
+            } else {
+                log.warn("Script for rule '{}' did not return a List. Result type: {}", rule.getName(), result != null ? result.getClass().getName() : "null");
             }
         } catch (Exception e) {
+            log.error("Error executing Groovy script for rule '{}'", rule.getName(), e);
             violations.add(Violation.builder()
                     .rule(rule)
                     .filePath(fileName)

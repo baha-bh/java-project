@@ -59,8 +59,13 @@ public class RuleController {
         }
 
         Rule rule = mapper.toDomain(request);
-        log.debug("Mapped rule scriptLength: {}", 
-            rule.getScriptLogic() != null ? rule.getScriptLogic().length() : "null");
+        // Manually ensure scriptLogic is copied (failsafe for MapStruct issues)
+        rule.setScriptLogic(request.getScriptLogic());
+        
+        log.info("Mapped domain rule: name={}, scriptPresent={}, scriptLength={}", 
+            rule.getName(), 
+            rule.getScriptLogic() != null,
+            rule.getScriptLogic() != null ? rule.getScriptLogic().length() : 0);
 
         if (rule.getIsActive() == null) {
             rule.setIsActive(true);
@@ -77,6 +82,7 @@ public class RuleController {
             rule.setCode(rule.getCode().substring(0, 50));
         }
         Rule created = ruleService.createRule(rule);
+        log.info("Rule created successfully: ID={}", created.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(created));
     }
 

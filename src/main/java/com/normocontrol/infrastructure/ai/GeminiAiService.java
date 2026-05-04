@@ -66,7 +66,7 @@ public class GeminiAiService {
                 throw new RuntimeException("Gemini API Key is empty!");
             }
             
-            // Using gemini-flash-latest as a stable alias, often has more reliable quota
+            // Reverting to gemini-flash-latest as requested
             String absoluteUrl = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=" + cleanKey;
             log.info("Requesting Gemini (flash-latest) via v1beta...");
 
