@@ -26,7 +26,9 @@ export const Rules = () => {
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleDesc, setNewRuleDesc] = useState('');
   const [newRuleCat, setNewRuleCat] = useState('CODE_STYLE');
+  const [newRuleSev, setNewRuleSev] = useState('MEDIUM');
   const [isSaving, setIsSaving] = useState(false);
+  const [generatedScript, setGeneratedScript] = useState('');
 
   const fetchRules = async () => {
     try {
@@ -59,22 +61,43 @@ export const Rules = () => {
         name: newRuleName,
         description: newRuleDesc,
         category: newRuleCat,
+        severity: newRuleSev,
+        scriptLogic: generatedScript,
         isActive: true
       }, {
-        headers: { Authorization: `Bearer ${session.access_token}` }
+        headers: { Authorization: `Bearer ${session?.access_token}` }
       });
-      
-      fetchRules();
-      setIsAddModalOpen(false);
       setNewRuleName('');
       setNewRuleDesc('');
+      setGeneratedScript('');
+      fetchRules();
+      setIsAddModalOpen(false);
     } catch (error) {
-      console.error('Error adding rule:', error);
+      console.error('Error creating rule:', error);
       alert('Ошибка при добавлении правила');
     } finally {
       setIsSaving(false);
     }
   };
+
+  const toggleAll = async (active: boolean) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await axios.post(`/api/v1/rules/toggle-all?active=${active}`, {}, {
+        headers: { Authorization: `Bearer ${session?.access_token}` }
+      });
+      fetchRules();
+    } catch (error) {
+      console.error('Error toggling all rules:', error);
+      alert('Ошибка при изменении статуса правил');
+    }
+  };
+
+  const projectCategories = ['CODE_STYLE', 'ARCHITECTURE', 'NAMING', 'SECURITY'];
+  const documentCategories = ['DOCUMENT_STRUCTURE', 'GOST_STANDARDS', 'FORMATTING'];
+
+  const projectRules = rules.filter(r => projectCategories.includes(r.category) || !documentCategories.includes(r.category));
+  const documentRules = rules.filter(r => documentCategories.includes(r.category));
 
   const handleDeleteRule = async (id: string) => {
     if (!confirm('Вы уверены, что хотите удалить это правило?')) return;
@@ -115,52 +138,124 @@ export const Rules = () => {
       
       <main style={{ flex: 1, padding: '2rem', maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <div>
-            <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Правила нормоконтроля</h1>
-            <p style={{ color: 'var(--text-color-muted)' }}>Управление стандартами и проверками кода</p>
+          <h1 style={{ fontSize: '2rem', fontWeight: 'bold' }}>Правила валидации</h1>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <button 
+              onClick={() => toggleAll(true)}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.875rem' }}
+            >
+              Включить все
+            </button>
+            <button 
+              onClick={() => toggleAll(false)}
+              className="btn btn-secondary"
+              style={{ fontSize: '0.875rem' }}
+            >
+              Выключить все
+            </button>
+            <button 
+              onClick={() => setIsAddModalOpen(true)}
+              className="btn btn-primary"
+            >
+              + Новое правило
+            </button>
           </div>
-          <button className="btn btn-primary" onClick={() => setIsAddModalOpen(true)}>
-            <Plus size={18} />
-            Добавить правило
-          </button>
         </div>
 
         {loading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-color-muted)' }}>Загрузка правил...</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
-            {rules.map((rule) => (
-              <div key={rule.id} className="glass-panel" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                  <div style={{ padding: '0.5rem', backgroundColor: 'var(--bg-color-tertiary)', borderRadius: 'var(--radius-md)', color: 'var(--primary-color)' }}>
-                    <ShieldCheck size={20} />
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button 
-                      onClick={() => handleToggleRule(rule.id)}
-                      style={{ background: 'none', border: 'none', color: rule.isActive ? 'var(--success-color)' : 'var(--text-color-muted)', cursor: 'pointer' }}
-                      title={rule.isActive ? 'Активно' : 'Выключено'}
-                    >
-                      {rule.isActive ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteRule(rule.id)}
-                      style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer', opacity: 0.7 }}
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-                
-                <h3 style={{ fontWeight: '600', fontSize: '1.125rem', marginBottom: '0.5rem' }}>{rule.name}</h3>
-                <div style={{ marginBottom: '1rem', fontSize: '0.75rem', color: 'var(--primary-color)', backgroundColor: 'rgba(99, 102, 241, 0.1)', padding: '0.25rem 0.5rem', borderRadius: '4px', alignSelf: 'flex-start' }}>
-                  {rule.category}
-                </div>
-                <p style={{ fontSize: '0.875rem', color: 'var(--text-color-muted)', flex: 1, lineHeight: '1.5' }}>
-                  {rule.description}
-                </p>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            {/* Project Rules Section */}
+            <section>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--primary-color)' }}>💻</span> Проекты
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-color-muted)', marginLeft: 'auto' }}>
+                  {projectRules.length} правил
+                </span>
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {projectRules.length > 0 ? (
+                  projectRules.map(rule => (
+                    <div key={rule.id} className="glass-panel" style={{ padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.25rem' }}>{rule.name}</h3>
+                          <p style={{ color: 'var(--text-color-muted)', fontSize: '0.875rem', marginBottom: '0.75rem' }}>{rule.description}</p>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', backgroundColor: 'rgba(99, 102, 241, 0.1)', padding: '0.125rem 0.375rem', borderRadius: '4px' }}>
+                              {rule.category}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '1rem' }}>
+                          <button 
+                            onClick={() => handleToggleRule(rule.id)}
+                            style={{ background: 'none', border: 'none', color: rule.isActive ? 'var(--success-color)' : 'var(--text-color-muted)', cursor: 'pointer' }}
+                          >
+                            {rule.isActive ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteRule(rule.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-color-muted)' }}>Нет активных правил</div>
+                )}
               </div>
-            ))}
+            </section>
+
+            {/* Document Rules Section */}
+            <section>
+              <h2 style={{ fontSize: '1.5rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--primary-color)' }}>📄</span> Документы
+                <span style={{ fontSize: '0.875rem', color: 'var(--text-color-muted)', marginLeft: 'auto' }}>
+                  {documentRules.length} правил
+                </span>
+              </h2>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {documentRules.length > 0 ? (
+                  documentRules.map(rule => (
+                    <div key={rule.id} className="glass-panel" style={{ padding: '1.25rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div style={{ flex: 1 }}>
+                          <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.25rem' }}>{rule.name}</h3>
+                          <p style={{ color: 'var(--text-color-muted)', fontSize: '0.875rem', marginBottom: '0.75rem' }}>{rule.description}</p>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--primary-color)', backgroundColor: 'rgba(99, 102, 241, 0.1)', padding: '0.125rem 0.375rem', borderRadius: '4px' }}>
+                              {rule.category}
+                            </span>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginLeft: '1rem' }}>
+                          <button 
+                            onClick={() => handleToggleRule(rule.id)}
+                            style={{ background: 'none', border: 'none', color: rule.isActive ? 'var(--success-color)' : 'var(--text-color-muted)', cursor: 'pointer' }}
+                          >
+                            {rule.isActive ? <ToggleRight size={24} /> : <ToggleLeft size={24} />}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteRule(rule.id)}
+                            style={{ background: 'none', border: 'none', color: 'var(--danger-color)', cursor: 'pointer' }}
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-color-muted)' }}>Нет активных правил</div>
+                )}
+              </div>
+            </section>
           </div>
         )}
 
@@ -208,23 +303,98 @@ export const Rules = () => {
               </div>
 
               <div>
-                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Описание</label>
-                <textarea 
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Важность</label>
+                <select 
                   className="input-field" 
-                  value={newRuleDesc}
-                  onChange={(e) => setNewRuleDesc(e.target.value)}
-                  placeholder="Подробное описание правила и как его соблюдать"
-                  rows={4}
-                  required 
-                />
+                  value={newRuleSev}
+                  onChange={(e) => setNewRuleSev(e.target.value)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="LOW">LOW</option>
+                  <option value="MEDIUM">MEDIUM</option>
+                  <option value="HIGH">HIGH</option>
+                </select>
               </div>
 
+              <div>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Описание (или промпт для AI)</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <textarea 
+                    className="input-field" 
+                    value={newRuleDesc}
+                    onChange={(e) => setNewRuleDesc(e.target.value)}
+                    placeholder="Например: Методы не должны быть длиннее 50 строк"
+                    rows={3}
+                    style={{ flex: 1 }}
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    className="btn btn-outline" 
+                    style={{ 
+                      alignSelf: 'flex-start', 
+                      padding: '0.75rem',
+                      borderColor: generatedScript ? 'var(--success-color)' : 'var(--border-color)',
+                      color: generatedScript ? 'var(--success-color)' : 'inherit'
+                    }}
+                    onClick={async () => {
+                      if (!newRuleDesc) {
+                        alert('Сначала введите описание правила для AI');
+                        return;
+                      }
+                      setIsSaving(true);
+                      try {
+                        const { data: { session } } = await supabase.auth.getSession();
+                        const response = await axios.post('/api/v1/rules/generate-ai', {
+                          description: newRuleDesc
+                        }, {
+                          headers: { Authorization: `Bearer ${session?.access_token}` }
+                        });
+                        if (response.data.script) {
+                          setGeneratedScript(response.data.script);
+                        } else {
+                          alert('AI вернул пустой результат');
+                        }
+                      } catch (error: any) {
+                        console.error('AI Error:', error);
+                        alert('Ошибка AI: ' + (error.response?.data?.message || error.message));
+                      } finally {
+                        setIsSaving(false);
+                      }
+                    }}
+                    disabled={isSaving}
+                  >
+                    <ShieldCheck size={18} /> {generatedScript ? 'Обновить AI' : 'AI'}
+                  </button>
+                </div>
+              </div>
+
+              {generatedScript && (
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Сгенерированный скрипт (Groovy)</label>
+                  <pre style={{ 
+                    backgroundColor: 'rgba(0,0,0,0.2)', 
+                    padding: '1rem', 
+                    borderRadius: '8px', 
+                    fontSize: '0.75rem', 
+                    overflowX: 'auto',
+                    maxHeight: '200px',
+                    border: '1px solid var(--border-color)'
+                  }}>
+                    {generatedScript}
+                  </pre>
+                </div>
+              )}
+
               <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem', justifyContent: 'flex-end' }}>
-                <button type="button" className="btn btn-outline" onClick={() => setIsAddModalOpen(false)}>
+                <button type="button" className="btn btn-outline" onClick={() => {
+                  setIsAddModalOpen(false);
+                  setGeneratedScript('');
+                }}>
                   Отмена
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={isSaving}>
-                  {isSaving ? 'Сохранение...' : 'Добавить'}
+                  {isSaving ? 'Обработка...' : 'Добавить'}
                 </button>
               </div>
             </form>

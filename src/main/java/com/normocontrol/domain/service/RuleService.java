@@ -4,6 +4,7 @@ import com.normocontrol.domain.model.Rule;
 import com.normocontrol.domain.port.RuleRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,5 +37,10 @@ public class RuleService {
             rule.setIsActive(!rule.getIsActive());
             return ruleRepository.save(rule);
         });
+    }
+
+    @Transactional
+    public void toggleAllStatus(boolean active) {
+        ruleRepository.updateAllStatus(active);
     }
 }

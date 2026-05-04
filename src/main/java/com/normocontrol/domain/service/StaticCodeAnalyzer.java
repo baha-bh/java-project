@@ -183,7 +183,38 @@ public class StaticCodeAnalyzer {
                         }
                     });
                 }
+            } else if (rule.getScriptLogic() != null && !rule.getScriptLogic().isBlank()) {
+                executeGroovyRule(cu, violations, fileName, rule);
             }
+        }
+    }
+
+    private void executeGroovyRule(CompilationUnit cu, List<Violation> violations, String fileName, Rule rule) {
+        try {
+            groovy.lang.Binding binding = new groovy.lang.Binding();
+            binding.setVariable("cu", cu);
+            groovy.lang.GroovyShell shell = new groovy.lang.GroovyShell(binding);
+            
+            Object result = shell.evaluate(rule.getScriptLogic());
+            
+            if (result instanceof List) {
+                List<Map<String, Object>> scriptViolations = (List<Map<String, Object>>) result;
+                for (Map<String, Object> sv : scriptViolations) {
+                    violations.add(Violation.builder()
+                            .rule(rule)
+                            .filePath(fileName)
+                            .lineNumber(sv.get("lineNumber") instanceof Integer ? (Integer) sv.get("lineNumber") : 0)
+                            .message(sv.get("message") != null ? sv.get("message").toString() : "Нарушение правила AI")
+                            .build());
+                }
+            }
+        } catch (Exception e) {
+            violations.add(Violation.builder()
+                    .rule(rule)
+                    .filePath(fileName)
+                    .lineNumber(0)
+                    .message("Ошибка при выполнении AI-скрипта: " + e.getMessage())
+                    .build());
         }
     }
 }

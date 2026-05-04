@@ -43,4 +43,9 @@ public class RuleRepositoryAdapter implements RuleRepository {
     public void deleteById(UUID id) {
         repository.deleteById(id);
     }
+
+    @Override
+    public void updateAllStatus(boolean active) {
+        repository.updateAllStatus(active);
+    }
 }

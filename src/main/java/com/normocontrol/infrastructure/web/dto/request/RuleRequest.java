@@ -25,4 +25,8 @@ public class RuleRequest {
     private String code;
 
     private Boolean isActive;
+
+    private String scriptLogic;
+
+    private String category;
 }

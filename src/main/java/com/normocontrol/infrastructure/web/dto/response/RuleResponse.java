@@ -20,5 +20,7 @@ public class RuleResponse {
     private RuleSeverity severity;
     private String code;
     private Boolean isActive;
+    private String scriptLogic;
+    private String category;
     private OffsetDateTime createdAt;
 }

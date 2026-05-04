@@ -11,4 +11,5 @@ public interface RuleRepository {
     Optional<Rule> findById(UUID id);
     List<Rule> findAll();
     void deleteById(UUID id);
+    void updateAllStatus(boolean active);
 }

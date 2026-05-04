@@ -19,10 +19,10 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
+      dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
         jdbc:
           batch_size: 20
@@ -61,6 +61,11 @@ server:
   servlet:
     context-path: /
 
+# Gemini AI Integration
+gemini:
+  api:
+    key: ${GEMINI_API_KEY:AIzaSyC9NGzeJBdmIeGQlFiLnvWa2mxqnJ7Hf4A}
+
 # Logging
 logging:
   level:
@@ -75,5 +80,5 @@ app:
   cors:
     allowed-origins: http://localhost:3000,http://localhost:8080
   analysis:
-    temp-dir: /tmp/normocontrol/analysis
+    temp-dir: ${java.io.tmpdir}/normocontrol/analysis
     max-file-size: 10485760

@@ -51,6 +51,9 @@ public class RuleEntity {
     @Column(name = "is_active")
     private Boolean isActive;
 
+    @Column(name = "script_logic", columnDefinition = "TEXT")
+    private String scriptLogic;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;

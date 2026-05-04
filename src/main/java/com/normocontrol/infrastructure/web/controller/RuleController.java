@@ -7,33 +7,74 @@ import com.normocontrol.infrastructure.web.dto.response.RuleResponse;
 import com.normocontrol.infrastructure.web.mapper.WebRuleMapper;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+import com.normocontrol.infrastructure.ai.GeminiAiService;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/rules")
 @RequiredArgsConstructor
+@Slf4j
 public class RuleController {
 
     private final RuleService ruleService;
     private final WebRuleMapper mapper;
+    private final GeminiAiService aiService;
+
+    @PostMapping("/generate-ai")
+    public ResponseEntity<Map<String, String>> generateAiRule(@RequestBody Map<String, String> request) {
+        String description = request.get("description");
+        if (description == null || description.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Description is required"));
+        }
+        String script = aiService.generateGroovyScript(description);
+        return ResponseEntity.ok(Map.of("script", script));
+    }
+
+    @PostMapping("/toggle-all")
+    @Transactional
+    public ResponseEntity<Void> toggleAllRules(@RequestParam boolean active) {
+        log.info("Toggling all rules to active={}", active);
+        ruleService.toggleAllStatus(active);
+        return ResponseEntity.ok().build();
+    }
 
     @PostMapping
     public ResponseEntity<RuleResponse> createRule(@Valid @RequestBody RuleRequest request) {
+        log.info("Creating new rule: name={}, category={}, scriptLength={}", 
+            request.getName(), request.getCategory(), 
+            request.getScriptLogic() != null ? request.getScriptLogic().length() : "null");
+        
+        if (request.getScriptLogic() == null || request.getScriptLogic().isBlank()) {
+            log.warn("Rule '{}' has NO script logic!", request.getName());
+        }
+
         Rule rule = mapper.toDomain(request);
+        log.debug("Mapped rule scriptLength: {}", 
+            rule.getScriptLogic() != null ? rule.getScriptLogic().length() : "null");
+
         if (rule.getIsActive() == null) {
-            rule.setIsActive(true); // Default true
+            rule.setIsActive(true);
+        }
+        if (rule.getCode() == null || rule.getCode().isBlank()) {
+            // Generate a safe code. If name is Russian, the regex might return empty string.
+            String safeCode = rule.getName().toUpperCase().replaceAll("\\s+", "_").replaceAll("[^A-Z0-9_]", "");
+            if (safeCode.isBlank()) {
+                safeCode = "RULE_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+            }
+            rule.setCode(safeCode);
+        }
+        if (rule.getCode().length() > 50) {
+            rule.setCode(rule.getCode().substring(0, 50));
         }
         Rule created = ruleService.createRule(rule);
         return ResponseEntity.status(HttpStatus.CREATED).body(mapper.toResponse(created));

@@ -10,7 +10,11 @@ import org.mapstruct.Mapping;
 public interface WebRuleMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "scriptLogic", source = "scriptLogic")
+    @Mapping(target = "isActive", source = "isActive")
     Rule toDomain(RuleRequest request);
 
+    @Mapping(target = "scriptLogic", source = "scriptLogic")
+    @Mapping(target = "isActive", source = "isActive")
     RuleResponse toResponse(Rule domain);
 }
