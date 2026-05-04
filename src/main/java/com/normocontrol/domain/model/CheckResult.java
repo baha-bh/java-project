@@ -17,6 +17,8 @@ public class CheckResult {
     private Project project;
     private CheckStatus status;
     private Integer score;
+    private String targetPath;
+    private String message;
     private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
 }

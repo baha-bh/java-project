@@ -18,6 +18,8 @@ public class CheckResultResponse {
     private UUID projectId;
     private CheckStatus status;
     private Integer score;
+    private String targetPath;
+    private String message;
     private OffsetDateTime startedAt;
     private OffsetDateTime completedAt;
 }

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { FolderGit2, Plus, ArrowRight, Upload } from 'lucide-react';
+import { FolderGit2, Plus, ArrowRight, Upload, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
@@ -89,6 +89,26 @@ export const Dashboard = () => {
     }
   };
 
+  const handleDeleteProject = async (e: React.MouseEvent, projectId: string) => {
+    e.stopPropagation(); // Prevent navigation
+    if (!window.confirm('Вы уверены, что хотите удалить этот проект? Все результаты проверок будут удалены.')) {
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      await axios.delete(`/api/v1/projects/${projectId}`, {
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+    } catch (error) {
+      console.error('Error deleting project:', error);
+      alert('Не удалось удалить проект');
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
@@ -168,7 +188,14 @@ export const Dashboard = () => {
                 <div style={{ color: 'var(--text-color-muted)', fontSize: '0.875rem', marginBottom: '1.5rem', flex: 1, wordBreak: 'break-all' }}>
                   {project.repositoryUrl}
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
+                  <button 
+                    className="btn btn-outline" 
+                    onClick={(e) => handleDeleteProject(e, project.id)}
+                    style={{ border: 'none', color: 'var(--danger-color)', padding: 0, display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+                  >
+                    <Trash2 size={16} /> Удалить
+                  </button>
                   <button className="btn btn-outline" style={{ border: 'none', color: 'var(--primary-color)', padding: 0 }}>
                     Анализ кода <ArrowRight size={16} />
                   </button>

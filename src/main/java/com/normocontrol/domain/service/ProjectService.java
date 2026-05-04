@@ -1,7 +1,6 @@
 package com.normocontrol.domain.service;
 
 import com.normocontrol.domain.model.Project;
-import com.normocontrol.domain.model.Role;
 import com.normocontrol.domain.model.User;
 import com.normocontrol.domain.port.ProjectRepository;
 import com.normocontrol.domain.port.UserRepository;
@@ -21,29 +20,12 @@ public class ProjectService {
     private final UserRepository userRepository;
  
     @Transactional
-    public Project createProject(Project project, UUID userId, String email) {
-        if (userId != null) {
-            User user = userRepository.findById(userId)
+    public Project createProject(Project project, UUID ownerId, String email) {
+        if (ownerId != null) {
+            User owner = userRepository.findById(ownerId)
                 .orElseGet(() -> userRepository.findByEmail(email)
-                    .map(existing -> {
-                        // User exists with same email but different ID (e.g. recreated in Supabase)
-                        // We delete the old record and create a new one with the current ID
-                        userRepository.deleteById(existing.getId());
-                        return userRepository.save(User.builder()
-                                .id(userId)
-                                .email(email)
-                                .username(email != null ? email : userId.toString())
-                                .role(existing.getRole())
-                                .build());
-                    })
-                    .orElseGet(() -> userRepository.save(User.builder()
-                            .id(userId)
-                            .email(email)
-                            .username(email != null ? email : userId.toString())
-                            .role(Role.USER)
-                            .build()))
-                );
-            project.setOwner(user);
+                    .orElseThrow(() -> new RuntimeException("Authenticated user not found in local database by ID or Email")));
+            project.setOwner(owner);
         }
         return projectRepository.save(project);
     }

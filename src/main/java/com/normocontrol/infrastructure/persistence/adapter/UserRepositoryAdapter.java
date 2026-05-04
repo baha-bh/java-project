@@ -46,4 +46,9 @@ public class UserRepositoryAdapter implements UserRepository {
     public void deleteById(UUID id) {
         springDataUserRepository.deleteById(id);
     }
+
+    @Override
+    public void flush() {
+        springDataUserRepository.flush();
+    }
 }

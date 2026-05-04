@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
@@ -13,7 +13,9 @@ import {
   Clock, 
   AlertCircle,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  FolderOpen,
+  Trash2
 } from 'lucide-react';
 
 interface Project {
@@ -27,8 +29,9 @@ interface Project {
 interface CheckResult {
   id: string;
   projectId: string;
-  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  status: 'IN_PROGRESS' | 'PASSED' | 'FAILED';
   score: number | null;
+  targetPath: string;
   startedAt: string;
   completedAt: string | null;
 }
@@ -41,8 +44,12 @@ export const ProjectDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [targetPath, setTargetPath] = useState('src/main/java');
+  const [selectedErrorMessage, setSelectedErrorMessage] = useState<string | null>(null);
+  const pollingInterval = useRef<NodeJS.Timeout | null>(null);
 
-  const fetchProjectData = async () => {
+  const fetchProjectData = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -56,22 +63,47 @@ export const ProjectDetails = () => {
       const projectRes = await axios.get(`/api/v1/projects/${id}`, { headers });
       setProject(projectRes.data);
 
-        const checksRes = await axios.get('/api/v1/checks', { headers });
-        const projectChecks = (checksRes.data || []).filter((c: any) => c.projectId === id);
-        setChecks(projectChecks.sort((a: any, b: any) => 
-          new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime()
-        ));
+      const checksRes = await axios.get('/api/v1/checks', { headers });
+      const projectChecks = (checksRes.data || []).filter((c: any) => c.projectId === id);
+      const sortedChecks = projectChecks.sort((a: any, b: any) => 
+        new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime()
+      );
+      
+      setChecks(sortedChecks);
+
+      // If any check is in progress, start/continue polling
+      const hasInProgress = sortedChecks.some((c: CheckResult) => c.status === 'IN_PROGRESS');
+      if (hasInProgress) {
+        startPolling();
+      } else {
+        stopPolling();
+      }
 
     } catch (err) {
       console.error('Error fetching project data:', err);
-      setError('Не удалось загрузить данные проекта');
+      if (!silent) setError('Не удалось загрузить данные проекта');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+    }
+  };
+
+  const startPolling = () => {
+    if (pollingInterval.current) return;
+    pollingInterval.current = setInterval(() => {
+      fetchProjectData(true);
+    }, 3000);
+  };
+
+  const stopPolling = () => {
+    if (pollingInterval.current) {
+      clearInterval(pollingInterval.current);
+      pollingInterval.current = null;
     }
   };
 
   useEffect(() => {
     fetchProjectData();
+    return () => stopPolling();
   }, [id, navigate]);
 
   const handleAnalyze = async () => {
@@ -80,12 +112,14 @@ export const ProjectDetails = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      await axios.post(`/api/v1/projects/${id}/analyze`, {}, {
+      await axios.post(`/api/v1/projects/${id}/analyze`, {
+        targetPath: targetPath
+      }, {
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
       
-      // Refresh data
-      await fetchProjectData();
+      // Refresh data and start polling
+      await fetchProjectData(true);
     } catch (err) {
       console.error('Error starting analysis:', err);
       alert('Ошибка при запуске анализа');
@@ -94,21 +128,40 @@ export const ProjectDetails = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('Вы уверены, что хотите полностью удалить этот проект и всю историю его проверок?')) {
+      return;
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      await axios.delete(`/api/v1/projects/${id}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` }
+      });
+      
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Error deleting project:', err);
+      alert('Ошибка при удалении проекта');
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return <CheckCircle2 size={18} style={{ color: 'var(--success-color)' }} />;
+      case 'PASSED': return <CheckCircle2 size={18} style={{ color: 'var(--success-color)' }} />;
       case 'FAILED': return <AlertCircle size={18} style={{ color: 'var(--danger-color)' }} />;
-      case 'RUNNING': return <Play size={18} className="spin" style={{ color: 'var(--primary-color)' }} />;
+      case 'IN_PROGRESS': return <Clock size={18} className="spin" style={{ color: 'var(--primary-color)' }} />;
       default: return <Clock size={18} style={{ color: 'var(--text-color-muted)' }} />;
     }
   };
 
   const getStatusLabel = (status: string) => {
     switch (status) {
-      case 'COMPLETED': return 'Завершено';
+      case 'PASSED': return 'Завершено';
       case 'FAILED': return 'Ошибка';
-      case 'RUNNING': return 'Выполняется';
-      case 'PENDING': return 'В очереди';
+      case 'IN_PROGRESS': return 'Выполняется';
       default: return status;
     }
   };
@@ -182,29 +235,25 @@ export const ProjectDetails = () => {
                 </div>
               </div>
             </div>
-            <button 
-              className="btn btn-primary" 
-              style={{ padding: '0.75rem 1.5rem' }}
-              onClick={handleAnalyze}
-              disabled={analyzing}
-            >
-              {analyzing ? (
-                <>
-                  <Clock size={18} className="spin" /> Анализ...
-                </>
-              ) : (
-                <>
-                  <Play size={18} /> Запустить анализ
-                </>
-              )}
-            </button>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <button 
+                className="btn btn-outline" 
+                onClick={handleDelete}
+                style={{ color: 'var(--danger-color)', border: '1px solid var(--danger-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <Trash2 size={18} /> Удалить проект
+              </button>
+            </div>
           </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '2rem' }}>
           {/* Main Content: History of Checks */}
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: '600', marginBottom: '1rem' }}>История проверок</h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '600' }}>История проверок</h2>
+            </div>
+            
             <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
               {checks.length === 0 ? (
                 <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-color-muted)' }}>
@@ -216,6 +265,7 @@ export const ProjectDetails = () => {
                     <tr style={{ borderBottom: '1px solid var(--glass-border)', textAlign: 'left' }}>
                       <th style={{ padding: '1rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>Статус</th>
                       <th style={{ padding: '1rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>Дата</th>
+                      <th style={{ padding: '1rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>Путь</th>
                       <th style={{ padding: '1rem', color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>Оценка</th>
                       <th style={{ padding: '1rem' }}></th>
                     </tr>
@@ -226,11 +276,34 @@ export const ProjectDetails = () => {
                         <td style={{ padding: '1rem' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             {getStatusIcon(check.status)}
-                            <span style={{ fontSize: '0.875rem' }}>{getStatusLabel(check.status)}</span>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                              <span style={{ fontSize: '0.875rem' }}>{getStatusLabel(check.status)}</span>
+                              {check.message && (
+                                <span 
+                                  onClick={() => setSelectedErrorMessage(check.message)}
+                                  style={{ 
+                                    fontSize: '0.75rem', 
+                                    color: check.status === 'FAILED' ? 'var(--danger-color)' : 'var(--text-color-muted)', 
+                                    maxWidth: '200px', 
+                                    whiteSpace: 'nowrap', 
+                                    overflow: 'hidden', 
+                                    textOverflow: 'ellipsis',
+                                    cursor: 'pointer',
+                                    textDecoration: 'underline dotted'
+                                  }} 
+                                  title="Нажмите, чтобы увидеть полный текст"
+                                >
+                                  {check.message}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </td>
                         <td style={{ padding: '1rem', fontSize: '0.875rem' }}>
                           {new Date(check.startedAt).toLocaleString()}
+                        </td>
+                        <td style={{ padding: '1rem', fontSize: '0.75rem', color: 'var(--text-color-muted)' }}>
+                          <code>{check.targetPath || '/'}</code>
                         </td>
                         <td style={{ padding: '1rem' }}>
                           {check.score !== null ? (
@@ -263,8 +336,49 @@ export const ProjectDetails = () => {
             </div>
           </div>
 
-          {/* Sidebar: Statistics / Summary */}
+          {/* Sidebar: New Analysis & Stats */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+            <div className="glass-panel" style={{ padding: '1.5rem' }}>
+              <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Play size={18} style={{ color: 'var(--primary-color)' }} /> Запуск анализа
+              </h3>
+              
+              <div style={{ marginBottom: '1.5rem' }}>
+                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Путь для анализа</label>
+                <div style={{ position: 'relative' }}>
+                  <FolderOpen size={16} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-color-muted)' }} />
+                  <input 
+                    type="text" 
+                    className="input-field" 
+                    style={{ paddingLeft: '2.5rem' }}
+                    value={targetPath}
+                    onChange={(e) => setTargetPath(e.target.value)}
+                    placeholder="напр. src/main/java"
+                  />
+                </div>
+                <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-color-muted)' }}>
+                  Оставьте пустым для анализа всего проекта.
+                </p>
+              </div>
+
+              <button 
+                className="btn btn-primary" 
+                style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+                onClick={handleAnalyze}
+                disabled={analyzing || checks.some(c => c.status === 'IN_PROGRESS')}
+              >
+                {analyzing || checks.some(c => c.status === 'IN_PROGRESS') ? (
+                  <>
+                    <Clock size={18} className="spin" /> Выполняется...
+                  </>
+                ) : (
+                  <>
+                    <Play size={18} /> Начать проверку
+                  </>
+                )}
+              </button>
+            </div>
+
             <div className="glass-panel" style={{ padding: '1.5rem' }}>
               <h3 style={{ fontSize: '1rem', fontWeight: '600', marginBottom: '1rem' }}>Статистика</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -276,7 +390,7 @@ export const ProjectDetails = () => {
                   <span style={{ color: 'var(--text-color-muted)', fontSize: '0.875rem' }}>Средний балл</span>
                   <span style={{ fontWeight: '600' }}>
                     {checks.length > 0 
-                      ? Math.round(checks.reduce((acc, c) => acc + (c.score || 0), 0) / checks.length) + '%' 
+                      ? Math.round(checks.filter(c => c.score !== null).reduce((acc, c) => acc + (c.score || 0), 0) / (checks.filter(c => c.score !== null).length || 1)) + '%' 
                       : 'N/A'}
                   </span>
                 </div>
@@ -293,6 +407,36 @@ export const ProjectDetails = () => {
           </div>
         </div>
       </main>
+
+      {/* Error Details Modal */}
+      {selectedErrorMessage && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0, 0, 0, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, backdropFilter: 'blur(4px)' }}>
+          <div className="glass-panel" style={{ width: '100%', maxWidth: '600px', padding: '2rem', position: 'relative' }}>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem', color: 'var(--danger-color)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={24} /> Детали ошибки
+            </h2>
+            <div style={{ 
+              backgroundColor: 'var(--bg-color-tertiary)', 
+              padding: '1.5rem', 
+              borderRadius: 'var(--radius-md)', 
+              fontSize: '0.875rem', 
+              fontFamily: 'monospace', 
+              whiteSpace: 'pre-wrap', 
+              maxHeight: '400px', 
+              overflowY: 'auto',
+              marginBottom: '1.5rem',
+              border: '1px solid var(--glass-border)'
+            }}>
+              {selectedErrorMessage}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => setSelectedErrorMessage(null)}>
+                Закрыть
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

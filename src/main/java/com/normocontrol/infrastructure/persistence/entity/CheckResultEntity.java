@@ -44,6 +44,12 @@ public class CheckResultEntity {
     private CheckStatus status;
 
     private Integer score;
+    
+    @Column(name = "target_path")
+    private String targetPath;
+
+    @Column(length = 1000)
+    private String message;
 
     @CreationTimestamp
     @Column(name = "started_at", nullable = false, updatable = false)

@@ -10,6 +10,8 @@ import com.normocontrol.domain.port.ProjectRepository;
 import com.normocontrol.domain.port.RuleRepository;
 import com.normocontrol.domain.port.ViolationRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +20,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AnalysisService {
@@ -27,59 +30,135 @@ public class AnalysisService {
     private final RuleRepository ruleRepository;
     private final ViolationRepository violationRepository;
     private final StaticCodeAnalyzer staticCodeAnalyzer;
+    private final GitService gitService;
 
     @Transactional
-    public CheckResult runAnalysis(UUID projectId) {
+    public CheckResult runAnalysis(UUID projectId, String targetPath) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
 
-        // 1. Create CheckResult in progress
         CheckResult checkResult = CheckResult.builder()
                 .project(project)
                 .status(CheckStatus.IN_PROGRESS)
+                .targetPath(targetPath != null ? targetPath : "/")
                 .startedAt(OffsetDateTime.now())
                 .build();
         
-        CheckResult savedCheck = checkResultRepository.save(checkResult);
-
-        // 2. Perform Real Analysis on local source files (POC)
-        List<Rule> activeRules = ruleRepository.findAll().stream()
-                .filter(Rule::getIsActive)
-                .toList();
-
-        // For POC, we scan our own src directory
-        File srcDir = new File("src/main/java");
-        analyzeDirectory(srcDir, savedCheck, activeRules);
-
-        // 3. Complete the check
-        long violationCount = violationRepository.findAll().stream()
-                .filter(v -> v.getCheckResult().getId().equals(savedCheck.getId()))
-                .count();
-
-        savedCheck.setStatus(CheckStatus.PASSED);
-        savedCheck.setScore(Math.max(0, 100 - (int)violationCount * 5));
-        savedCheck.setCompletedAt(OffsetDateTime.now());
-
-        return checkResultRepository.save(savedCheck);
+        return checkResultRepository.save(checkResult);
     }
 
-    private void analyzeDirectory(File dir, CheckResult checkResult, List<Rule> rules) {
-        if (!dir.exists() || !dir.isDirectory()) return;
+    @Async
+    @Transactional
+    public void performAnalysis(UUID checkId) {
+        CheckResult checkResult = checkResultRepository.findById(checkId)
+                .orElseThrow(() -> new RuntimeException("CheckResult not found"));
+        
+        Project project = checkResult.getProject();
+        File repoDir = null;
+
+        try {
+            log.info("Starting async analysis for check {}", checkId);
+            
+            // 1. Clone repository
+            checkResult.setMessage("Клонирование репозитория...");
+            checkResultRepository.save(checkResult);
+            
+            try {
+                repoDir = gitService.cloneRepository(project.getRepositoryUrl(), project.getBranch());
+            } catch (Exception e) {
+                failCheck(checkResult, "Ошибка клонирования: " + e.getMessage());
+                return;
+            }
+            
+            // 2. Determine target directory
+            checkResult.setMessage("Поиск файлов для анализа...");
+            checkResultRepository.save(checkResult);
+            
+            File analysisDir = repoDir;
+            String targetPath = checkResult.getTargetPath();
+            if (targetPath != null && !targetPath.equals("/") && !targetPath.isEmpty()) {
+                // Normalize path for the OS
+                String normalizedPath = targetPath.replace("/", File.separator).replace("\\", File.separator);
+                if (normalizedPath.startsWith(File.separator)) {
+                    normalizedPath = normalizedPath.substring(1);
+                }
+                analysisDir = new File(repoDir, normalizedPath);
+            }
+
+            if (!analysisDir.exists()) {
+                failCheck(checkResult, "Путь не найден в репозитории: " + targetPath);
+                return;
+            }
+
+            // 3. Perform Analysis
+            checkResult.setMessage("Анализ Java-файлов...");
+            checkResultRepository.save(checkResult);
+
+            List<Rule> activeRules = ruleRepository.findAll().stream()
+                    .filter(Rule::getIsActive)
+                    .toList();
+
+            int filesAnalyzed = analyzeDirectory(analysisDir, checkResult, activeRules);
+
+            if (filesAnalyzed == 0) {
+                failCheck(checkResult, "В указанной папке не найдено Java-файлов для анализа.");
+                return;
+            }
+
+            // 4. Complete the check
+            long violationCount = violationRepository.findAll().stream()
+                    .filter(v -> v.getCheckResult().getId().equals(checkId))
+                    .count();
+
+            checkResult.setStatus(CheckStatus.PASSED);
+            checkResult.setScore(Math.max(0, 100 - (int)violationCount * 5));
+            checkResult.setMessage("Анализ успешно завершен. Проверено файлов: " + filesAnalyzed);
+            checkResult.setCompletedAt(OffsetDateTime.now());
+            
+            checkResultRepository.save(checkResult);
+            log.info("Analysis completed for check {}. Score: {}", checkId, checkResult.getScore());
+
+        } catch (Exception e) {
+            log.error("Analysis failed for check {}", checkId, e);
+            failCheck(checkResult, "Внутренняя ошибка: " + e.getMessage());
+        } finally {
+            if (repoDir != null) {
+                gitService.deleteDirectory(repoDir);
+            }
+        }
+    }
+
+    private void failCheck(CheckResult check, String message) {
+        check.setStatus(CheckStatus.FAILED);
+        check.setMessage(message);
+        check.setCompletedAt(OffsetDateTime.now());
+        checkResultRepository.save(check);
+    }
+
+    private int analyzeDirectory(File dir, CheckResult checkResult, List<Rule> rules) {
+        if (!dir.exists() || !dir.isDirectory()) return 0;
         
         File[] files = dir.listFiles();
-        if (files == null) return;
+        if (files == null) return 0;
 
+        int count = 0;
         for (File file : files) {
             if (file.isDirectory()) {
-                analyzeDirectory(file, checkResult, rules);
+                count += analyzeDirectory(file, checkResult, rules);
             } else if (file.getName().endsWith(".java")) {
-                List<Violation> findings = staticCodeAnalyzer.analyzeFile(file, rules);
-                for (Violation v : findings) {
-                    v.setCheckResult(checkResult);
-                    violationRepository.save(v);
+                try {
+                    List<Violation> findings = staticCodeAnalyzer.analyzeFile(file, rules);
+                    for (Violation v : findings) {
+                        v.setCheckResult(checkResult);
+                        violationRepository.save(v);
+                    }
+                    count++;
+                } catch (Exception e) {
+                    log.warn("Failed to analyze file: {}", file.getAbsolutePath(), e);
                 }
             }
         }
+        return count;
     }
 
     public List<Violation> testAnalyzeFile(String filePath) {
