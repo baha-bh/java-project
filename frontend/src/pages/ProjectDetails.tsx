@@ -15,7 +15,8 @@ import {
   ExternalLink,
   ChevronRight,
   FolderOpen,
-  Trash2
+  Trash2,
+  FileDown
 } from 'lucide-react';
 
 interface Project {
@@ -323,10 +324,22 @@ export const ProjectDetails = () => {
                         <td style={{ padding: '1rem', textAlign: 'right' }}>
                           <button 
                             onClick={() => navigate(`/checks/${check.id}`)}
-                            style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer' }}
+                            style={{ background: 'none', border: 'none', color: 'var(--primary-color)', cursor: 'pointer', marginRight: '1rem' }}
+                            title="Детали"
                           >
-                            Детали <ChevronRight size={16} />
+                            <ChevronRight size={16} />
                           </button>
+                          {check.status === 'PASSED' && (
+                            <button 
+                              onClick={(e) => handleDownloadPdf(e, check.id)}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-color-muted)', cursor: 'pointer' }}
+                              title="Скачать PDF"
+                              onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary-color)'}
+                              onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-color-muted)'}
+                            >
+                              <FileDown size={16} />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}

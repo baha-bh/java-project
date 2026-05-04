@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navbar } from '../components/Navbar';
 import { supabase } from '../lib/supabase';
 import axios from 'axios';
-import { FolderGit2, Plus, ArrowRight, Upload, Trash2, Code } from 'lucide-react';
+import { FolderGit2, Plus, ArrowRight, Upload, Trash2, Code, FileDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface Project {
@@ -139,6 +139,43 @@ export const Dashboard = () => {
       setTestReport({ violations: [], details: [] });
     } finally {
       setIsTesting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!selectedFile) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+
+      const response = await axios.post('/api/v1/analysis/test-file/download', formData, {
+        responseType: 'blob',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      // Check if response is actually a JSON error hidden in a blob
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        alert(`Ошибка генерации PDF: ${error.message || 'Неизвестная ошибка'}`);
+        return;
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `report-${selectedFile.name}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error: any) {
+      console.error('Error downloading PDF:', error);
+      alert('Не удалось скачать PDF-отчет. Проверьте соединение с сервером.');
     }
   };
 
@@ -294,6 +331,13 @@ export const Dashboard = () => {
                   {testReport.score}%
                 </div>
                 <div style={{ fontSize: '0.75rem', color: 'var(--text-color-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Соответствие</div>
+                <button 
+                  onClick={handleDownloadPdf}
+                  className="btn btn-outline"
+                  style={{ marginTop: '0.5rem', padding: '0.4rem 0.75rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginLeft: 'auto' }}
+                >
+                  <FileDown size={14} /> Скачать PDF
+                </button>
               </div>
             </div>
 

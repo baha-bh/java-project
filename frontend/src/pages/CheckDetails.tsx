@@ -10,7 +10,8 @@ import {
   CheckCircle2, 
   Hash,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  FileDown
 } from 'lucide-react';
 
 interface Rule {
@@ -68,6 +69,39 @@ export const CheckDetails = () => {
     fetchCheckData();
   }, [id]);
 
+  const handleDownloadPdf = async () => {
+    if (!id) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await axios.get(`/api/v1/analysis/check/${id}/download`, {
+        responseType: 'blob',
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`
+        }
+      });
+
+      // Check if response is actually a JSON error hidden in a blob
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const error = JSON.parse(text);
+        alert(`Ошибка генерации PDF: ${error.message || 'Неизвестная ошибка'}`);
+        return;
+      }
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `report-${id.slice(0, 8)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Не удалось скачать PDF-отчет. Проверьте соединение с сервером.');
+    }
+  };
+
   if (loading) return <div className="glass-panel" style={{ margin: '2rem', padding: '2rem' }}>Загрузка результатов...</div>;
   if (!check) return <div className="glass-panel" style={{ margin: '2rem', padding: '2rem', color: 'var(--danger-color)' }}>Результат проверки не найден</div>;
 
@@ -95,6 +129,13 @@ export const CheckDetails = () => {
               {check.score || 0}%
             </div>
             <div style={{ fontSize: '0.875rem', color: 'var(--text-color-muted)' }}>Итоговая оценка</div>
+            <button 
+              onClick={handleDownloadPdf}
+              className="btn btn-primary"
+              style={{ marginTop: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', justifyContent: 'center' }}
+            >
+              <FileDown size={18} /> Скачать отчет (PDF)
+            </button>
           </div>
         </div>
 

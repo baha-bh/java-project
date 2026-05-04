@@ -8,6 +8,8 @@ public class AnalysisReport {
     private int score;
     private List<Violation> violations;
     private List<CheckDetail> details;
+    private java.time.OffsetDateTime createdAt = java.time.OffsetDateTime.now();
+    private Project project;
 
     public AnalysisReport() {}
 
@@ -27,25 +29,36 @@ public class AnalysisReport {
     public int getScore() { return score; }
     public List<Violation> getViolations() { return violations; }
     public List<CheckDetail> getDetails() { return details; }
+    public java.time.OffsetDateTime getCreatedAt() { return createdAt; }
+    public Project getProject() { return project; }
 
     // Setters
     public void setFileName(String fileName) { this.fileName = fileName; }
     public void setScore(int score) { this.score = score; }
     public void setViolations(List<Violation> violations) { this.violations = violations; }
     public void setDetails(List<CheckDetail> details) { this.details = details; }
+    public void setCreatedAt(java.time.OffsetDateTime createdAt) { this.createdAt = createdAt; }
+    public void setProject(Project project) { this.project = project; }
 
     public static class AnalysisReportBuilder {
         private String fileName;
         private int score;
         private List<Violation> violations = new ArrayList<>();
         private List<CheckDetail> details = new ArrayList<>();
+        private java.time.OffsetDateTime createdAt = java.time.OffsetDateTime.now();
+        private Project project;
 
         public AnalysisReportBuilder fileName(String fileName) { this.fileName = fileName; return this; }
         public AnalysisReportBuilder score(int score) { this.score = score; return this; }
         public AnalysisReportBuilder violations(List<Violation> violations) { this.violations = violations; return this; }
         public AnalysisReportBuilder details(List<CheckDetail> details) { this.details = details; return this; }
+        public AnalysisReportBuilder createdAt(java.time.OffsetDateTime createdAt) { this.createdAt = createdAt; return this; }
+        public AnalysisReportBuilder project(Project project) { this.project = project; return this; }
         public AnalysisReport build() {
-            return new AnalysisReport(fileName, score, violations, details);
+            AnalysisReport report = new AnalysisReport(fileName, score, violations, details);
+            report.setCreatedAt(createdAt);
+            report.setProject(project);
+            return report;
         }
     }
 

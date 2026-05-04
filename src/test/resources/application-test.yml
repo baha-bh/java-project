@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: 
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: https://badawaighvqpegsxfvdc.supabase.co/auth/v1
+          jwk-set-uri: https://badawaighvqpegsxfvdc.supabase.co/auth/v1/validator/jwks
+
+# Disable Kafka and other external services for tests if necessary
+logging:
+  level:
+    org.springframework.security: DEBUG

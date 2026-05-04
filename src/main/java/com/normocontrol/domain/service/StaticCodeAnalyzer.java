@@ -152,6 +152,37 @@ public class StaticCodeAnalyzer {
                                 .build());
                     }
                 });
+            } else if ("ARCHITECTURE_LAYER_VIOLATION".equals(rule.getCode())) {
+                cu.getImports().forEach(imp -> {
+                    String importName = imp.getNameAsString();
+                    String packageName = cu.getPackageDeclaration().map(pd -> pd.getNameAsString()).orElse("");
+                    
+                    // Domain layer should not import infrastructure or web
+                    if (packageName.contains(".domain") && 
+                        (importName.contains(".infrastructure") || importName.contains(".web"))) {
+                        violations.add(Violation.builder()
+                                .rule(rule)
+                                .filePath(fileName)
+                                .lineNumber(imp.getBegin().map(p -> p.line).orElse(0))
+                                .message("Нарушение Clean Architecture: Доменный слой не должен зависеть от инфраструктуры (" + importName + ").")
+                                .build());
+                    }
+                });
+            } else if ("ARCHITECTURE_CONTROLLER_REPOSITORY".equals(rule.getCode())) {
+                String packageName = cu.getPackageDeclaration().map(pd -> pd.getNameAsString()).orElse("");
+                if (packageName.contains(".web") || packageName.contains(".controller")) {
+                    cu.getImports().forEach(imp -> {
+                        String importName = imp.getNameAsString();
+                        if (importName.contains(".repository") || importName.contains(".persistence")) {
+                            violations.add(Violation.builder()
+                                    .rule(rule)
+                                    .filePath(fileName)
+                                    .lineNumber(imp.getBegin().map(p -> p.line).orElse(0))
+                                    .message("Нарушение Clean Architecture: Контроллер не должен напрямую зависеть от репозитория (" + importName + "). Используйте сервисы.")
+                                    .build());
+                        }
+                    });
+                }
             }
         }
     }

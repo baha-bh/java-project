@@ -19,12 +19,14 @@ C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\d
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\CheckResultService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\DocumentationAnalyzer.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\GitService.java
+C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\PdfReportService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\ProjectService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\RuleService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\StaticCodeAnalyzer.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\UserSyncService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\ViolationService.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\domain\service\WordDocumentAnalyzer.java
+C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\infrastructure\config\AsyncConfig.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\infrastructure\config\DataInitializer.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\infrastructure\persistence\adapter\AuditLogRepositoryAdapter.java
 C:\Users\Bahtiyar\Documents\GitHub\java-project\src\main\java\com\normocontrol\infrastructure\persistence\adapter\CheckResultRepositoryAdapter.java

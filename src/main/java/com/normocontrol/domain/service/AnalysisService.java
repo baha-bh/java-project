@@ -222,4 +222,20 @@ public class AnalysisService {
                 .score(Math.max(0, 100 - violations.size() * 10))
                 .build();
     }
+
+    public AnalysisReport getReportForCheck(UUID checkId) {
+        com.normocontrol.domain.model.CheckResult check = checkResultRepository.findById(checkId)
+                .orElseThrow(() -> new RuntimeException("Check not found"));
+        
+        List<Violation> violations = violationRepository.findAll().stream()
+                .filter(v -> v.getCheckResult().getId().equals(checkId))
+                .toList();
+
+        return AnalysisReport.builder()
+                .fileName("Project Analysis") // In a real app, we'd store the specific filename or project name
+                .violations(violations)
+                .details(List.of()) // For project checks, we mostly have violations
+                .score(check.getScore() != null ? check.getScore() : 0)
+                .build();
+    }
 }
